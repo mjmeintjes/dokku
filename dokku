@@ -30,12 +30,16 @@ case "$1" in
 
   build)
     APP="$2"; IMAGE="app/$APP"; CACHE_DIR="$DOKKU_ROOT/$APP/cache"
-    id=$(cat | docker run -i -a stdin progrium/buildstep /bin/bash -c "mkdir -p /app && tar -xC /app")
+    BASEBOX_NAME=$(: | pluginhook basebox-name $IMAGE)
+    : ${BASEBOX_NAME:="progrium/buildstep"}
+    id=$(cat | docker run -i -a stdin $BASEBOX_NAME /bin/bash -c "mkdir -p /app && tar -xC /app")
     test $(docker wait $id) -eq 0
     docker commit $id $IMAGE > /dev/null
     [[ -d $CACHE_DIR ]] || mkdir $CACHE_DIR
     pluginhook pre-build $APP
-    id=$(docker run -d -v $CACHE_DIR:/cache $IMAGE /build/builder)
+    BUILD_COMMAND=$(: | pluginhook build-command $APP)
+    : ${BUILD_COMMAND:="/build/builder"}
+    id=$(docker run -d -v $CACHE_DIR:/cache $IMAGE $BUILD_COMMAND)
     docker attach $id
     test $(docker wait $id) -eq 0
     docker commit $id $IMAGE > /dev/null
